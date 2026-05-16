@@ -1,0 +1,338 @@
+{% extends "layout.html" %}
+{% block title %}D-URS - Student Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">
+        <i class="bi bi-columns-gap me-2"></i>Welcome, {{ session.username }}
+    </h4>
+    <span class="badge bg-secondary fs-6">
+        <i class="bi bi-hdd-stack me-1"></i>Virtual Node: {{ peer_info.ip }}:{{ peer_info.port }}
+    </span>
+</div>
+
+<div class="row g-4">
+    <!-- Left Column -->
+    <div class="col-lg-4">
+        <!-- Share File -->
+        <div class="card shadow-sm border-0 mb-4" style="border-radius:12px">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0"><i class="bi bi-cloud-arrow-up me-2 text-primary"></i>Share a File</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/share" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Select File</label>
+                        <input type="file" class="form-control form-control-sm" name="file" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Topic / Category</label>
+                        <select class="form-select form-select-sm" name="topic" required>
+                            <option value="" disabled selected>-- Select a topic --</option>
+                            {% for t in topics %}
+                            <option value="{{ t.name }}">{{ t.name }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if not topics %}
+                        <div class="form-text text-danger">No topics available. Ask your admin to create topics.</div>
+                        {% endif %}
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="bi bi-upload me-1"></i>Share on Network
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Subscribe -->
+        <div class="card shadow-sm border-0 mb-4" style="border-radius:12px">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0"><i class="bi bi-bell me-2 text-warning"></i>Subscribe to Topic</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/subscribe">
+                    <div class="input-group input-group-sm">
+                        <select class="form-select" name="topic" required>
+                            <option value="" disabled selected>-- Select a topic --</option>
+                            {% for t in topics %}
+                            {% if t.name not in subscribed_topics %}
+                            <option value="{{ t.name }}">{{ t.name }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                    </div>
+                    {% if not topics %}
+                    <div class="form-text text-danger mt-1">No topics available yet.</div>
+                    {% endif %}
+                </form>
+                {% if subscribed_topics %}
+                <div class="mt-3">
+                    <small class="text-muted fw-semibold">Your Subscriptions:</small>
+                    <div class="mt-1">
+                        {% for t in subscribed_topics %}
+                        <span class="badge bg-warning text-dark me-1 mb-1 d-inline-flex align-items-center">
+                            <i class="bi bi-tag me-1"></i>{{ t }}
+                            <form method="POST" action="/unsubscribe" style="display:inline; margin:0; padding:0;">
+                                <input type="hidden" name="topic" value="{{ t }}">
+                                <button type="submit" class="btn-close btn-close-sm ms-1" style="font-size:0.55rem; filter:none; opacity:0.8;" title="Unsubscribe"></button>
+                            </form>
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- My Shared Files (with management) -->
+        <div class="card shadow-sm border-0 mb-4" style="border-radius:12px">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-folder-check me-2 text-success"></i>My Shared Files</h6>
+                <span class="badge bg-success">{{ my_files|length }}</span>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light">
+                        <tr><th>Filename</th><th>Size</th><th>Topic</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for f in my_files %}
+                        <tr>
+                            <td class="small"><i class="bi bi-file-earmark me-1"></i>{{ f.filename }}</td>
+                            <td class="small text-muted">
+                                {% if f.file_size >= 1048576 %}
+                                    {{ "%.1f"|format(f.file_size / 1048576) }} MB
+                                {% elif f.file_size >= 1024 %}
+                                    {{ "%.1f"|format(f.file_size / 1024) }} KB
+                                {% else %}
+                                    {{ f.file_size }} B
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-info text-dark">{{ f.topic }}</span></td>
+                            <td>
+                                <form method="POST" action="/delete_file" style="display:inline"
+                                      onsubmit="return confirm('Are you sure you want to delete this file?');">
+                                    <input type="hidden" name="file_id" value="{{ f.id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not my_files %}
+                        <tr><td colspan="4" class="text-center text-muted py-3 small">No files shared yet.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="card shadow-sm border-0 mb-4" style="border-radius:12px">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-lightning me-2 text-info"></i>Notifications</h6>
+                <span class="badge bg-info" id="notif-count">0</span>
+            </div>
+            <div class="card-body notification-area" id="notifications">
+                <div class="text-center text-muted small py-3" id="no-notif">
+                    <i class="bi bi-bell-slash"></i> No notifications yet.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column -->
+    <div class="col-lg-8">
+        <!-- Search -->
+        <div class="card shadow-sm border-0 mb-4" style="border-radius:12px">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0"><i class="bi bi-search me-2 text-success"></i>Search Files on Network</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="/search" class="d-flex gap-2">
+                    <input type="text" class="form-control form-control-sm" name="query" placeholder="Search by filename..." value="{{ search_query or '' }}" required>
+                    <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-search"></i></button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Search Results -->
+        {% if search_results is defined and search_results is not none %}
+        <div class="card shadow-sm border-0 mb-4" style="border-radius:12px">
+            <div class="card-header bg-white py-3">
+                <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Search Results for "{{ search_query }}"</h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr><th>Filename</th><th>Owner</th><th>Topic</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for f in search_results %}
+                        <tr>
+                            <td><i class="bi bi-file-earmark me-1"></i>{{ f.filename }}</td>
+                            <td><span class="badge bg-dark">{{ f.owner }}</span></td>
+                            <td><span class="badge bg-info text-dark">{{ f.topic }}</span></td>
+                            <td>
+                                <form method="POST" action="/download" style="display:inline">
+                                    <input type="hidden" name="filename" value="{{ f.filename }}">
+                                    <input type="hidden" name="owner" value="{{ f.owner }}">
+                                    <input type="hidden" name="file_hash" value="{{ f.file_hash }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-download me-1"></i>Download
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not search_results %}
+                        <tr><td colspan="4" class="text-center text-muted py-3">No results found.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- My Subscriptions Files -->
+        <div class="card shadow-sm border-0 mb-4" style="border-radius:12px">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-bookmark-star me-2 text-warning"></i>My Subscriptions</h6>
+                <span class="badge bg-warning text-dark">{{ subscribed_files|length }} files</span>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr><th>Filename</th><th>Owner</th><th>Hash</th><th>Topic</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for f in subscribed_files %}
+                        <tr>
+                            <td><i class="bi bi-file-earmark me-1"></i>{{ f.filename }}</td>
+                            <td><span class="badge bg-dark">{{ f.owner }}</span></td>
+                            <td><code>{{ f.file_hash[:12] }}...</code></td>
+                            <td><span class="badge bg-warning text-dark">{{ f.topic }}</span></td>
+                            <td>
+                                <form method="POST" action="/download" style="display:inline">
+                                    <input type="hidden" name="filename" value="{{ f.filename }}">
+                                    <input type="hidden" name="owner" value="{{ f.owner }}">
+                                    <input type="hidden" name="file_hash" value="{{ f.file_hash }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-download me-1"></i>Download
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not subscribed_files %}
+                        <tr><td colspan="5" class="text-center text-muted py-3">
+                            {% if subscribed_topics %}
+                            No files published yet in your subscribed topics.
+                            {% else %}
+                            Subscribe to topics to see related files here.
+                            {% endif %}
+                        </td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- DFS: Virtual Network Drive (NFS Lecture 10 - Access Transparency) -->
+        <!-- This section simulates a Virtual File System (VFS) that presents all
+             distributed files as if they were on a single network drive, hiding
+             the actual peer locations from the user (Access Transparency). -->
+        <div class="card shadow-sm border-0 mb-4" style="border-radius:12px">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-hdd-network me-2 text-primary"></i>Virtual Network Drive (DFS)</h6>
+                <span class="badge bg-primary">{{ all_files|length }} files</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                <table class="table table-hover mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Filename</th>
+                            <th>Size</th>
+                            <th>Type</th>
+                            <th>Owner</th>
+                            <th>Topic</th>
+                            <th>File Handle (GUID)</th>
+                            <th>Created</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in all_files %}
+                        <tr>
+                            <td><i class="bi bi-file-earmark me-1"></i>{{ f.filename }}</td>
+                            <td>
+                                {% if f.file_size >= 1048576 %}
+                                    {{ "%.1f"|format(f.file_size / 1048576) }} MB
+                                {% elif f.file_size >= 1024 %}
+                                    {{ "%.1f"|format(f.file_size / 1024) }} KB
+                                {% else %}
+                                    {{ f.file_size }} B
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-light text-dark border">{{ f.file_type or 'unknown' }}</span></td>
+                            <td><span class="badge bg-dark">{{ f.owner }}</span></td>
+                            <td><span class="badge bg-info text-dark">{{ f.topic }}</span></td>
+                            <td><code title="{{ f.file_hash }}">{{ f.file_hash[:12] }}...</code></td>
+                            <td class="text-muted">{{ f.created_at or '-' }}</td>
+                            <td>
+                                <form method="POST" action="/download" style="display:inline">
+                                    <input type="hidden" name="filename" value="{{ f.filename }}">
+                                    <input type="hidden" name="owner" value="{{ f.owner }}">
+                                    <input type="hidden" name="file_hash" value="{{ f.file_hash }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-download me-1"></i>Download
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not all_files %}
+                        <tr><td colspan="8" class="text-center text-muted py-3">No files on the network yet.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let lastCount = 0;
+    function pollNotifications() {
+        fetch('/api/notifications')
+            .then(r => r.json())
+            .then(data => {
+                const container = document.getElementById('notifications');
+                const countBadge = document.getElementById('notif-count');
+                const noNotif = document.getElementById('no-notif');
+                countBadge.textContent = data.length;
+                if (data.length > 0) {
+                    if (noNotif) noNotif.style.display = 'none';
+                    if (data.length !== lastCount) {
+                        let html = '';
+                        data.forEach(n => {
+                            html += '<div class="notification-item"><i class="bi bi-lightning-fill text-info me-1"></i>' + n.message + '</div>';
+                        });
+                        container.innerHTML = html;
+                        lastCount = data.length;
+                    }
+                }
+            })
+            .catch(() => {});
+    }
+    setInterval(pollNotifications, 3000);
+    pollNotifications();
+</script>
+{% endblock %}

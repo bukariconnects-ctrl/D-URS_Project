@@ -1,0 +1,1 @@
+These are lecture notes for Distributed Systems 101.
